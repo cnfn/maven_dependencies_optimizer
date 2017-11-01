@@ -2,9 +2,9 @@
 
 import os
 import re
-import sys
 from functools import reduce
 
+import click
 from bs4 import BeautifulSoup
 from lxml import etree
 
@@ -41,30 +41,37 @@ def replace(filepath, old_str, new_str):
       fout.write(content.replace(old_str, new_str))
 
 
-def remove_dependency_if_possible(pom, dependency):
+def remove_dependency_if_possible(pom, dependency, mvn_cmd):
   place_holder = '<!-- TEST -->\n'
   replace(pom, dependency, place_holder)
-  cmd = 'cd {dir} && {mvn_cmd} &> /dev/null'.format(dir=os.path.split(pom)[0], mvn_cmd=sys.argv[2])
+  cmd = 'cd {dir} && {mvn_cmd} &> /dev/null'.format(dir=os.path.split(pom)[0], mvn_cmd=mvn_cmd)
   ret = os.system(cmd)
   if ret:
-    print('FAILED')
     replace(pom, place_holder, dependency)
+    return False
   else:
-    print('SUCCESS')
     replace(pom, place_holder, '\n')
+    return True
 
 
-if '__main__' == __name__:
-  if 3 != len(sys.argv):
-    print("Usage: {0} /path/to/root/pom.xml 'mvn command to use'".format(sys.argv[0]))
-    exit(1)
+@click.command()
+@click.option('--pom', prompt=True, type=str, help='/path/to/pom.xml')
+@click.option('--mvn_cmd', prompt=True, default='mvn clean install -DskipTest=True', type=str,
+              help='the maven command for build project or module', show_default=True)
+def main(pom, mvn_cmd):
+  '''
+  This script will remove extra Maven dependencies of
+  special project and all it's sub modules.
 
-  print("This script will remove extra Maven dependencies of {0} and all it's sub modules".format(sys.argv[1]))
-  print("Dependencies are removed one by one and if the command '{0}' is successful the dependency is left out".format(
-    sys.argv[2]))
+  Dependencies are removed one by one and
+  if the maven command is successful the dependency is left out.
 
+  The default maven command is `mvn clean install -DskipTests=true`
+  '''
+  print(pom)
+  print(mvn_cmd)
   poms_and_dependencies = {}
-  get_poms_and_dependencies(sys.argv[1], poms_and_dependencies)
+  get_poms_and_dependencies(pom, poms_and_dependencies)
   all_dependencies = reduce((lambda a, b: a + b), poms_and_dependencies.values(), [])
   print('Total number of pom.xml files {pom_count}, total number of dependencies {dependency_count}'.format(
     pom_count=len(poms_and_dependencies), dependency_count=len(all_dependencies)))
@@ -75,7 +82,14 @@ if '__main__' == __name__:
     for dependency in dependencies:
       group_id = re.match('[\s\S]*<groupId>(.*)</groupId>', dependency).group(1)
       artifact_id = re.match('[\s\S]*<artifactId>(.*)</artifactId>', dependency).group(1)
-      print("{counter}/{total_count}: remove {group_id}:{artifact_id}...".format(
-        counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id), end='', flush=True)
-      remove_dependency_if_possible(pom, dependency)
+      click.secho("{counter}/{total_count}: remove {group_id}:{artifact_id}...".format(
+        counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id), nl=False)
+      if remove_dependency_if_possible(pom, dependency, mvn_cmd):
+        click.secho('SUCCESS', bold=True, blink=True, fg='green')
+      else:
+        click.secho('FAILED', bold=True)
       counter += 1
+
+
+if '__main__' == __name__:
+  main()
