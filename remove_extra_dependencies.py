@@ -46,8 +46,7 @@ def remove_dependency_if_possible(pom, dependency, mvn_cmd):
     place_holder = '<!-- TEST -->\n'
     replace(pom, dependency, place_holder)
     cmd = 'cd {dir} && {mvn_cmd} &> /dev/null'.format(dir=os.path.split(pom)[0], mvn_cmd=mvn_cmd)
-    ret = os.system(cmd)
-    if ret:
+    if os.system(cmd):
         replace(pom, place_holder, dependency)
         return False
     else:
@@ -70,9 +69,8 @@ def main(pom, mvn_cmd):
     The default maven command is `mvn clean install -DskipTests=true`
     '''
     begin_time = datetime.now()
-    poms_and_dependencies = {}
-    get_poms_and_dependencies(pom, poms_and_dependencies)
-    all_dependencies = reduce((lambda a, b: a + b), poms_and_dependencies.values(), [])
+    poms_and_dependencies = get_poms_and_dependencies(pom)
+    all_dependencies = reduce((lambda a, b: a + b), poms_and_dependencies.values())
     print('Total number of pom.xml files {pom_count}, total number of dependencies {dependency_count}'.format(
         pom_count=len(poms_and_dependencies), dependency_count=len(all_dependencies)))
 
