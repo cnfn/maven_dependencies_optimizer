@@ -58,7 +58,9 @@ def remove_dependency_if_possible(pom, dependency, mvn_cmd):
 @click.option('--pom', prompt=True, type=str, help='/path/to/pom.xml')
 @click.option('--mvn_cmd', prompt=True, default='mvn clean install -DskipTest=True', type=str,
               help='the maven command for build project or module', show_default=True)
-def main(pom, mvn_cmd):
+@click.option('--project/--module', default=True,
+              help='execute maven command for project or module? default for project')
+def main(pom, mvn_cmd, project):
     '''
     This script will remove extra Maven dependencies of
     special project and all it's sub modules.
@@ -76,16 +78,16 @@ def main(pom, mvn_cmd):
 
     counter = 1
     deleted = 0
-    for pom, dependencies in poms_and_dependencies.items():
-        print('Handling {count} dependencies of {pom}'.format(count=len(dependencies), pom=pom))
+    for module_pom, dependencies in poms_and_dependencies.items():
+        print('Handling {count} dependencies of {pom}'.format(count=len(dependencies), pom=module_pom))
         for dependency in dependencies:
             group_id = re.match('[\s\S]*<groupId>(.*)</groupId>', dependency).group(1)
             artifact_id = re.match('[\s\S]*<artifactId>(.*)</artifactId>', dependency).group(1)
             click.secho("{counter}/{total_count}({deleted}): remove {group_id}:{artifact_id}...".format(
                 counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id,
-                deleted=click.style('deleted: {deleted}'.format(deleted=deleted), bold=True, blink=True, fg='green')
+                deleted=click.style('deleted: {deleted}'.format(deleted=deleted), bold=True, fg='green')
             ), nl=False)
-            if remove_dependency_if_possible(pom, dependency, mvn_cmd):
+            if remove_dependency_if_possible(pom if project else module_pom, dependency, mvn_cmd):
                 click.secho('SUCCESS', bold=True, blink=True, fg='green')
                 deleted += 1
             else:
