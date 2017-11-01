@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import datetime
 from functools import reduce
 
 import click
@@ -68,8 +69,7 @@ def main(pom, mvn_cmd):
 
     The default maven command is `mvn clean install -DskipTests=true`
     '''
-    print(pom)
-    print(mvn_cmd)
+    begin_time = datetime.now()
     poms_and_dependencies = {}
     get_poms_and_dependencies(pom, poms_and_dependencies)
     all_dependencies = reduce((lambda a, b: a + b), poms_and_dependencies.values(), [])
@@ -77,19 +77,25 @@ def main(pom, mvn_cmd):
         pom_count=len(poms_and_dependencies), dependency_count=len(all_dependencies)))
 
     counter = 1
+    deleted = 0
     for pom, dependencies in poms_and_dependencies.items():
         print('Handling {count} dependencies of {pom}'.format(count=len(dependencies), pom=pom))
         for dependency in dependencies:
             group_id = re.match('[\s\S]*<groupId>(.*)</groupId>', dependency).group(1)
             artifact_id = re.match('[\s\S]*<artifactId>(.*)</artifactId>', dependency).group(1)
-            click.secho("{counter}/{total_count}: remove {group_id}:{artifact_id}...".format(
-                counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id),
-                nl=False)
+            click.secho("{counter}/{total_count}({deleted}): remove {group_id}:{artifact_id}...".format(
+                counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id,
+                deleted=click.style('deleted: {deleted}'.format(deleted=deleted), bold=True, blink=True, fg='green')
+            ), nl=False)
             if remove_dependency_if_possible(pom, dependency, mvn_cmd):
                 click.secho('SUCCESS', bold=True, blink=True, fg='green')
+                deleted += 1
             else:
                 click.secho('FAILED', bold=True)
             counter += 1
+    elapsed = datetime.now() - begin_time
+    click.secho('Total remove {deleted} dependencies, elapsed time: {elapsed}'.format(deleted=deleted, elapsed=elapsed),
+                bold=True, blink=True, fg='green')
 
 
 if '__main__' == __name__:
