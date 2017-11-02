@@ -21,8 +21,9 @@ def get_dependencies(pom):
 
 
 def get_modules(pom):
-    modules = BeautifulSoup(open(pom), 'xml').select('project modules module')
-    return [module.text for module in modules]
+    with open(pom) as fin:
+        modules = BeautifulSoup(fin, 'xml').select('project modules module')
+        return [module.text for module in modules]
 
 
 def get_poms_and_dependencies(pom, result={}):
