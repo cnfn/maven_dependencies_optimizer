@@ -46,7 +46,9 @@ def replace(filepath, old_str, new_str):
 def remove_dependency_if_possible(pom, dependency, mvn_cmd):
     place_holder = '<!-- TEST -->\n'
     replace(pom, dependency, place_holder)
-    cmd = 'cd {dir} && {mvn_cmd} &> /dev/null'.format(dir=os.path.split(pom)[0], mvn_cmd=mvn_cmd)
+
+    work_path = os.path.split(pom)[0]
+    cmd = f'cd {work_path} && {mvn_cmd} &> /dev/null'
     if os.system(cmd):
         replace(pom, place_holder, dependency)
         return False
@@ -74,20 +76,20 @@ def main(pom, mvn_cmd, project):
     begin_time = datetime.now()
     poms_and_dependencies = get_poms_and_dependencies(pom)
     all_dependencies = reduce((lambda a, b: a + b), poms_and_dependencies.values())
-    print('Total number of pom.xml files {pom_count}, total number of dependencies {dependency_count}'.format(
-        pom_count=len(poms_and_dependencies), dependency_count=len(all_dependencies)))
+    print(f'Total number of pom.xml files {len(poms_and_dependencies)}, '
+          f'total number of dependencies {len(all_dependencies)}')
 
     counter = 1
     deleted = 0
     for module_pom, dependencies in poms_and_dependencies.items():
-        print('Handling {count} dependencies of {pom}'.format(count=len(dependencies), pom=module_pom))
+        print(f'Handling {len(dependencies)} dependencies of {module_pom}')
         for dependency in dependencies:
             group_id = re.match('[\s\S]*<groupId>(.*)</groupId>', dependency).group(1)
             artifact_id = re.match('[\s\S]*<artifactId>(.*)</artifactId>', dependency).group(1)
-            click.secho("{counter}/{total_count}({deleted}): remove {group_id}:{artifact_id}...".format(
-                counter=counter, total_count=len(all_dependencies), group_id=group_id, artifact_id=artifact_id,
-                deleted=click.style('deleted: {deleted}'.format(deleted=deleted), bold=True, fg='green')
-            ), nl=False)
+
+            deleted_str = click.style(f'deleted: {deleted}', bold=True, fg='green')
+            click.secho(f'{counter}/{len(all_dependencies)}({deleted_str}): remove {group_id}:{artifact_id}...', nl=False)
+
             if remove_dependency_if_possible(pom if project else module_pom, dependency, mvn_cmd):
                 click.secho('SUCCESS', bold=True, blink=True, fg='green')
                 deleted += 1
@@ -95,8 +97,7 @@ def main(pom, mvn_cmd, project):
                 click.secho('FAILED', bold=True)
             counter += 1
     elapsed = datetime.now() - begin_time
-    click.secho('Total remove {deleted} dependencies, elapsed time: {elapsed}'.format(deleted=deleted, elapsed=elapsed),
-                bold=True, blink=True, fg='green')
+    click.secho(f'Total remove {deleted} dependencies, elapsed time: {elapsed}', bold=True, blink=True, fg='green')
 
 
 if '__main__' == __name__:
